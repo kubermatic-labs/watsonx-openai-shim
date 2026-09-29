@@ -20,6 +20,12 @@ dockerd --host=unix:///var/run/docker.sock &
 DOCKERD_PID=$!
 trap 'kill "$DOCKERD_PID"' EXIT
 
-sleep 5 # wait for dockerd to start
+for _ in {1..30}; do
+  if docker info >/dev/null 2>&1; then
+    exec "$@"
+  fi
+  sleep 1
+done
 
-exec "$@"
+echo "dockerd did not become ready within 30 seconds" >&2
+exit 1
