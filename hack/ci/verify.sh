@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Copyright 2026 The Kubermatic Kubernetes Platform contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/static:nonroot
-ARG TARGETPLATFORM
-COPY $TARGETPLATFORM/watsonx-openai-shim /usr/local/bin/
-ENTRYPOINT ["/usr/local/bin/watsonx-openai-shim"]
+set -euo pipefail
+
+cd "$(dirname "$0")"/../..
+
+make verify-file-headers lint test

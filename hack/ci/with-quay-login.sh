@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Copyright 2026 The Kubermatic Kubernetes Platform contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/static:nonroot
-ARG TARGETPLATFORM
-COPY $TARGETPLATFORM/watsonx-openai-shim /usr/local/bin/
-ENTRYPOINT ["/usr/local/bin/watsonx-openai-shim"]
+set -euo pipefail
+
+[ "${QUAY_IO_USERNAME:-}" ] && [ "${QUAY_IO_PASSWORD:-}" ] || { echo "QUAY_IO_USERNAME and QUAY_IO_PASSWORD must be set"; exit 1; }
+
+echo "${QUAY_IO_PASSWORD}" | docker login quay.io -u "${QUAY_IO_USERNAME}" --password-stdin
+
+unset QUAY_IO_USERNAME
+unset QUAY_IO_PASSWORD
+
+exec "$@"

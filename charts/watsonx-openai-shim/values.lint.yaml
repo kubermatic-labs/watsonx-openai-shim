@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/static:nonroot
-ARG TARGETPLATFORM
-COPY $TARGETPLATFORM/watsonx-openai-shim /usr/local/bin/
-ENTRYPOINT ["/usr/local/bin/watsonx-openai-shim"]
+route:
+  identifier: abcd12345678901234567890
+
+watsonx:
+  url: fake-url
+  projectID: fake-project-id
+  credentials:
+    apiKey: fake-api-key
+    username: fake-user
