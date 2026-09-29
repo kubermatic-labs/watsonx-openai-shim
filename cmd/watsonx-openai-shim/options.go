@@ -141,7 +141,7 @@ func (o *options) watsonxConfig() (watsonx.Config, error) {
 		errs = append(errs, errors.New("--api-key is required"))
 	}
 	if o.insecureSkipVerify && o.authMode == string(watsonx.AuthModeIAM) {
-		errs = append(errs, errors.New("--insecure-skip-verify cannot be used with iam auth mode"))
+		errs = append(errs, errors.New("--insecure-skip-tls-verify cannot be used with iam auth mode"))
 	}
 
 	tlsConfig, err := o.tlsConfig()
