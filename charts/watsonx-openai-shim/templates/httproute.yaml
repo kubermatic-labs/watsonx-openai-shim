@@ -24,7 +24,7 @@ metadata:
     # kubelb management cluster.
     # LLMBackend resource must use this label to select the corresponding HTTPRoute.
     {{- $identifier := required "route.identifier is required when route.enabled is true (it is the key an LLMBackend selects this route by)" .Values.route.identifier -}}
-    {{- if lt (len $identifier) 24 }}{{ fail "route.identifier must be at least 24 characters" }}{{- end }}
+    {{- if or (lt (len $identifier) 24) (gt (len $identifier) 63) (not (regexMatch "^[A-Za-z0-9]([A-Za-z0-9_.-]*[A-Za-z0-9])?$" $identifier)) }}{{ fail "route.identifier must be 24-63 characters and a valid Kubernetes label value" }}{{- end }}
     ai.kdp.k8c.io/secret-provider-route-key: {{ $identifier | quote }}
     {{- include "watsonx-openai-shim.labels" . | nindent 4 }}
 spec:
