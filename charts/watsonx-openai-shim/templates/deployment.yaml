@@ -35,6 +35,8 @@ spec:
       {{- include "watsonx-openai-shim.deployment.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/credentials: {{ include (print $.Template.BasePath "/credentials-secret.yaml") . | sha256sum }}
       labels:
         {{- include "watsonx-openai-shim.labels" . | nindent 8 }}
         app.kubernetes.io/component: gateway
