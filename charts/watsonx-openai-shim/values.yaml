@@ -1,0 +1,229 @@
+# Copyright 2026 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+global:
+  # The global registry used for all container images, and the pull secrets used
+  # with it. Both apply unless this chart was given its own value:
+  # image.registry and imagePullSecrets take precedence.
+  imageRegistry: ''
+  imagePullSecrets: []
+    # - name: my-registry-secret
+
+# image is the shim image, built from cmd/watsonx-openai-shim/Dockerfile.
+image:
+  # registry overrides global.imageRegistry for this chart. Left empty it
+  # falls back to global.imageRegistry, and then to quay.io/kubermatic.
+  registry: ""
+  repository: "watsonx-openai-shim"
+  tag: "v0.0.0-dev"
+  # pullPolicy specifies the image pull policy.
+  # It defaults to "Always" for the "latest" tag and "IfNotPresent" otherwise.
+  pullPolicy: ""
+
+# imagePullSecrets is a list of references to Secrets used for pulling images.
+# Entries may be plain strings or {name: ...} maps. Left empty it falls back
+# to global.imagePullSecrets; a non-empty list here replaces the global one
+# rather than adding to it.
+imagePullSecrets: []
+
+# logLevel is the shim's log level: debug, info, warn or error.
+# debug also logs every response and stream chunk received from watsonx, including model output.
+logLevel: info
+
+# watsonx describes the Cloud Pak for Data / watsonx instance the gateway talks
+# to, and the credential it authenticates with.
+watsonx:
+  # url is the CPD base URL, https and no path (e.g. https://watsonx.innotech.center).
+  # Keep it a hostname rather than an IP so SNI and the Host header stay correct,
+  # and resolve it with deployment.hostAliases, if needed. Required.
+  url: ""
+
+  # projectID is the watsonx.ai project UUID the gateway sends with every request.
+  # Required.
+  projectID: ""
+
+  # authMode specifies how the gateway authenticates with the CPD/watsonx instance.
+  # Allowed values:
+  #   - "cpd" (for on-prem CPD installations)
+  #   - "iam" (for IBM Cloud)
+  # CPD login via /icp4d-api/v1/authorize. It also makes /v1/models
+  # list the custom foundation models deployed on the instance.
+  authMode: "cpd"
+
+  # credentials is the CPD username and API key the gateway authenticates with.
+  # apiKeyKey must hold the bare key - not the combined "<username>:<apikey>" form.
+  # Give it either way round, but not both:
+  #
+  #   - secretName, to point at a Secret that already exists. Taken literally -
+  #     template expressions are not evaluated here.
+  #   - username and apiKey, to have the chart create the Secret itself. Note
+  #     they then live in plain text in this file.
+  credentials:
+    secretName: ""
+    username: ""
+    apiKey: ""
+    # usernameKey and apiKeyKey are the data keys inside the Secret, read when
+    # it already exists and written when the chart creates it.
+    usernameKey: "username"
+    apiKeyKey: "apiKey"
+
+# service exposes the Deployment in the cluster. This is what an LLMBackend's
+# spec.serviceRef points at.
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+
+# route exposes the proxy Service through a Gateway API HTTPRoute, labelled so
+# that kdp-llm-controller-manager can discover it from the KubeLB management
+# cluster.
+route:
+  enabled: true
+  # identifier is the value of the discovery label an LLMBackend selects the
+  # route by. Required when the route is enabled.
+  identifier: ""
+  pathPrefix: /watsonx/
+  gateway:
+    name: llm-provider-gateway
+    namespace: "{{ .Release.Namespace }}"
+
+# deployment configures the watsonx-openai-shim Deployment
+# (cmd/watsonx-openai-shim), an OpenAI-compatible front end for a CPD/watsonx
+# instance reachable only over the overlay network its `sidecars` join. It
+# translates OpenAI requests into watsonx /ml/v1 chat calls and adds the
+# project_id every watsonx request needs - which is why it replaces a plain
+# TLS-re-originating proxy.
+#
+# It obtains its own CPD bearer token from /icp4d-api/v1/authorize and replaces
+# it before it expires, so nothing else has to refresh a token for this path.
+#
+# The hop from the caller to this Deployment is plain HTTP inside the cluster.
+deployment:
+  # One replica: each additional one registers as its own overlay peer.
+  replicas: 1
+
+  # hostAliases resolves the CPD hostname to its overlay address inside the pod,
+  # since CoreDNS knows nothing about it. Run through `tpl`, e.g.:
+  #
+  # hostAliases:
+  #   - ip: "10.32.1.30"
+  #     hostnames:
+  #       - watsonx.innotech.center
+  hostAliases: []
+
+  # port the gateway listens on, passed to it as --listen-addr.
+  port: 8080
+
+  # env are extra environment variables for the gateway container, run through
+  # `tpl`. Standard env entries. Further gateway flags can be set as WXS_ env
+  # vars, e.g. WXS_DEFAULT_MAX_TOKENS for --default-max-tokens or WXS_CA_FILE
+  # for --ca-file.
+  env: []
+
+  # extraVolumeMounts are added to the proxy container, for anything supplied
+  # through the top-level extraVolumes.
+  extraVolumeMounts: []
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+  nodeSelector: {}
+  tolerations: []
+
+  # Keep the proxy off GPU nodes: it is a small network-bound pod and has no
+  # business occupying capacity meant for model serving.
+  #
+  # NotIn rather than DoesNotExist, so a node that carries the label with any
+  # other value stays eligible; a node without the label at all matches either
+  # way, since NotIn is true for an absent key.
+  #
+  # Setting `affinity` replaces this wholesale - repeat the rule in an override
+  # that needs to keep it.
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: NotIn
+                values:
+                  - "true"
+
+  # sidecars are extra containers that run alongside the proxy, for a CPD endpoint
+  # that is only reachable over an overlay network (NetBird) or through a local
+  # proxy.
+  #
+  # Each entry is a plain container spec. They are rendered as native sidecars -
+  # initContainers with restartPolicy: Always - so the overlay is up before the
+  # proxy serves. That requires Kubernetes >= 1.29. An entry's restartPolicy may
+  # only be Always; any other value is rejected, since it would turn the sidecar
+  # into a plain init container that blocks the proxy until it exits.
+  #
+  # Entries are run through `tpl`, so a secretKeyRef may name a Secret as
+  # "{{ .Release.Name }}-netbird" and match an entry of the top-level `secrets`.
+  #
+  # A sidecar needing NET_ADMIN (a VPN agent creating a tun device) declares that
+  # in its own securityContext:
+  #
+  # sidecars:
+  #   - name: netbird
+  #     image: netbirdio/netbird:0.79.0
+  #     env:
+  #       - name: NB_SETUP_KEY
+  #         valueFrom:
+  #           secretKeyRef:
+  #             name: "{{ .Release.Name }}-netbird-creds"
+  #             key: setupKey
+  #       - name: NB_MANAGEMENT_URL
+  #         valueFrom:
+  #           secretKeyRef:
+  #             name: "{{ .Release.Name }}-netbird-creds"
+  #             key: accessURL
+  #       - name: NB_HOSTNAME
+  #         value: watsonx-openai-shim
+  #       - name: NB_LOG_LEVEL
+  #         value: "info"
+  #     securityContext:
+  #       runAsNonRoot: false
+  #       runAsUser: 0
+  #       privileged: true
+  #       capabilities:
+  #         add:
+  #           - NET_ADMIN
+  #           - SYS_RESOURCE
+  #           - SYS_ADMIN
+  sidecars: []
+
+  # extraVolumes are appended to the pod's volumes, for whatever the sidecars
+  # mount. Standard volume entries, also run through `tpl`, e.g.:
+  #
+  # extraVolumes:
+  #   - name: netbird-state
+  #     emptyDir: {}
+  extraVolumes: []
+
+# extraSecrets declares Secrets the chart creates, keyed by Secret name. The
+# name may reference the release, e.g. "{{ .Release.Name }}-zen-apikey". Values
+# are taken verbatim, so they are given in plain text here - fine for localenv
+# and dev, less so wherever the environment already has secret management.
+#
+# extraSecrets:
+#   "{{ .Release.Name }}-netbird-creds":
+#     setupKey: "<your-setup-key>"
+#     accessURL: "<your-access-url>"
+extraSecrets: {}

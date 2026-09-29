@@ -1,0 +1,10 @@
+*.iml*
+.DS_Store
+.cover
+.idea
+/.vscode
+
+_build
+vendor
+
+charts/watsonx-openai-shim/values-custom.yaml
