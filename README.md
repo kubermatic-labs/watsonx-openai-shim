@@ -120,7 +120,7 @@ Errors:
 
 To build the container image, run:
 ```sh
-make container
+make snapshot
 ```
 
 To run the tests, run:
