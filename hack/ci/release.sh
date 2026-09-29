@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Copyright 2026 The Kubermatic Kubernetes Platform contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/static:nonroot
-ARG TARGETPLATFORM
-COPY $TARGETPLATFORM/watsonx-openai-shim /usr/local/bin/
-ENTRYPOINT ["/usr/local/bin/watsonx-openai-shim"]
+set -euo pipefail
+
+cd "$(dirname "$0")"/../..
+
+[ -f /etc/github/oauth ] || { echo "/etc/github/oauth not found; requires preset-kubermatic-bot-token" >&2; exit 1; }
+
+make verify-file-headers lint test
+
+git remote add origin git@github.com:kubermatic-labs/watsonx-openai-shim.git
+export GITHUB_TOKEN=$(cat /etc/github/oauth | tr -d '\n')
+
+./hack/ci/with-dockerd.sh ./hack/ci/with-quay-login.sh make release
