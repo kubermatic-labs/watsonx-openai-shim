@@ -21,6 +21,7 @@ changelog:
       - '^docs(\([^)]+\))?:'
       - '^test(\([^)]+\))?:'
       - '^chore(\([^)]+\))?:'
+      - '^ci(\([^)]+\))?:'
 dockers_v2:
   - images:
       - quay.io/kubermatic-labs/watsonx-openai-shim
