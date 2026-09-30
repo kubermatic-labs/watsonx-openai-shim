@@ -20,9 +20,16 @@ cd "$(dirname "$0")"/../..
 
 [ -f /etc/github/oauth ] || { echo "/etc/github/oauth not found; requires preset-kubermatic-bot-token" >&2; exit 1; }
 
-make verify-file-headers lint test
+TOOL_LOCATIONS="GORELEASER=$(which goreleaser) GOLANGCI_LINT=$(which golangci-lint) BOILERPLATE=$(which boilerplate)"
+
+go version
+boilerplate --version
+golangci-lint --version
+goreleaser --version
+
+make verify-file-headers lint test $TOOL_LOCATIONS
 
 git remote add origin git@github.com:kubermatic-labs/watsonx-openai-shim.git
 export GITHUB_TOKEN=$(cat /etc/github/oauth | tr -d '\n')
 
-./hack/ci/with-dockerd.sh ./hack/ci/with-quay-login.sh make release
+./hack/ci/with-dockerd.sh ./hack/ci/with-quay-login.sh make release $TOOL_LOCATIONS
