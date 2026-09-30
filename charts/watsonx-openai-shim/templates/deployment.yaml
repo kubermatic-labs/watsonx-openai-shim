@@ -1,0 +1,129 @@
+# Copyright 2026 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- include "watsonx-openai-shim.deployment.validate" . }}
+{{- $deploy := .Values.deployment }}
+{{- $watsonx := .Values.watsonx }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "watsonx-openai-shim.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ $deploy.replicas }}
+  # Recreate rather than RollingUpdate: each replica registers as its own
+  # overlay peer, so an overlapping rollout leaves a second peer behind that
+  # only disappears once the ephemeral setup key times it out.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "watsonx-openai-shim.deployment.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/credentials: {{ include (print $.Template.BasePath "/credentials-secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "watsonx-openai-shim.labels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      {{- with $deploy.hostAliases }}
+      hostAliases:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      {{- with (include "watsonx-openai-shim.sidecarContainers" .) }}
+      {{- . | nindent 6 }}
+      {{- end }}
+      containers:
+        - name: watsonx-openai-shim
+          image: {{ include "watsonx-openai-shim.image" . | quote }}
+          imagePullPolicy: {{ default (ternary "Always" "IfNotPresent" (eq .Values.image.tag "latest")) .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $deploy.port }}
+          # The gateway reads every flag from a WXS_ env var, e.g. --project-id
+          # from WXS_PROJECT_ID, and refuses to start on unknown WXS_ env vars.
+          env:
+            - name: WXS_LISTEN_ADDR
+              value: ":{{ $deploy.port }}"
+            - name: WXS_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            - name: WXS_WATSONX_URL
+              value: {{ $watsonx.url | quote }}
+            - name: WXS_PROJECT_ID
+              value: {{ $watsonx.projectID | quote }}
+            - name: WXS_AUTH_MODE
+              value: {{ $watsonx.authMode | quote }}
+            {{- if eq $watsonx.authMode "cpd" }}
+            - name: WXS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "watsonx-openai-shim.credentialsSecretName" . | quote }}
+                  key: {{ $watsonx.credentials.usernameKey | quote }}
+            {{- end }}
+            - name: WXS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "watsonx-openai-shim.credentialsSecretName" . | quote }}
+                  key: {{ $watsonx.credentials.apiKeyKey | quote }}
+            {{- with $deploy.env }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
+            {{- end }}
+          # /healthz is served locally, so both probes stay cheap and do not
+          # depend on the tunnel. Note the consequence: readiness only says the
+          # process is up, not that the overlay or the credential works - a pod
+          # that cannot reach CPD still gets a Service endpoint.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          {{- with $deploy.extraVolumeMounts }}
+          volumeMounts:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml $deploy.resources | nindent 12 }}
+      {{- with .Values.deployment.extraVolumes }}
+      volumes:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      {{- with (include "watsonx-openai-shim.imagePullSecrets" .) }}
+      imagePullSecrets:
+        {{- . | trim | nindent 8 }}
+      {{- end }}
+      {{- with $deploy.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $deploy.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $deploy.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,52 @@
+# Copyright 2026 The Kubermatic Kubernetes Platform contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- if and .Values.route.enabled .Values.service.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    # The label allows kdp-llm-controller-manager (running within the kubelb management cluster)
+    # to discover the LLM provider's route that lives within a tenant namespace within the
+    # kubelb management cluster.
+    # LLMBackend resource must use this label to select the corresponding HTTPRoute.
+    {{- $identifier := required "route.identifier is required when route.enabled is true (it is the key an LLMBackend selects this route by)" .Values.route.identifier -}}
+    {{- if or (lt (len $identifier) 24) (gt (len $identifier) 63) (not (regexMatch "^[A-Za-z0-9]([A-Za-z0-9_.-]*[A-Za-z0-9])?$" $identifier)) }}{{ fail "route.identifier must be 24-63 characters and a valid Kubernetes label value" }}{{- end }}
+    ai.kdp.k8c.io/secret-provider-route-key: {{ $identifier | quote }}
+    {{- include "watsonx-openai-shim.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.route.gateway.name }}
+      namespace: {{ tpl .Values.route.gateway.namespace . }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ .Values.route.pathPrefix }}
+      filters:
+        # Strip the path prefix from the request before passing it down to the backing LLM Service.
+        # Though, as long as llm-cm is not wiring up the attached Gateway but the backing Service
+        # to the AgentgatewayBackend directly (to save a hop), this isn't actually effective.
+        # (It is still defined here to keep the door open for wiring up the Gateway later.)
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: {{ .Release.Name }}
+          port: {{ .Values.service.port }}
+{{- end }}

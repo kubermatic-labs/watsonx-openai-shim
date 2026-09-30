@@ -1,0 +1,18 @@
+# See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
+
+approvers:
+  - mgoltzsche
+  - neolit123
+  - dakraus
+  - xmudrii
+  - moadqassem
+  - xrstf
+
+reviewers:
+  - mgoltzsche
+  - neolit123
+  - dakraus
+  - xmudrii
+  - moadqassem
+  - xrstf
+

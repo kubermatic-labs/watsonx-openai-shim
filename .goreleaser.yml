@@ -1,0 +1,50 @@
+version: 2
+project_name: watsonx-openai-shim
+dist: ./_build/dist
+builds:
+  - id: watsonx-openai-shim
+    main: ./cmd/watsonx-openai-shim
+    targets:
+      - linux_amd64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -extldflags "-static"
+      - -X github.com/kubermatic-labs/watsonx-openai-shim/internal/version.gitVersion={{.Version}}
+      - -X github.com/kubermatic-labs/watsonx-openai-shim/internal/version.gitHead={{.ShortCommit}}
+snapshot:
+  version_template: '{{ incpatch .Version }}-dev-{{.ShortCommit}}'
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs(\([^)]+\))?:'
+      - '^test(\([^)]+\))?:'
+      - '^chore(\([^)]+\))?:'
+dockers_v2:
+  - images:
+      - quay.io/kubermatic/watsonx-openai-shim
+    tags:
+      - latest
+      - "{{.Major}}"
+      - "{{.Version}}"
+    dockerfile: Dockerfile
+    ids:
+      - watsonx-openai-shim
+    sbom: false
+    labels:
+      "org.opencontainers.image.description": "OpenAI-compatible chat API for IBM watsonx.ai."
+      "org.opencontainers.image.created": "{{.Date}}"
+      "org.opencontainers.image.name": "{{.ProjectName}}"
+      "org.opencontainers.image.revision": "{{.FullCommit}}"
+      "org.opencontainers.image.version": "{{.Version}}"
+      "org.opencontainers.image.source": "{{.GitURL}}"
+    platforms:
+      - linux/amd64
+    hooks:
+      post:
+        - cmd: hack/release-helm-chart.sh charts/watsonx-openai-shim quay.io/kubermatic/helm-charts {{ .Version }}
+          env:
+            - IMAGE_TAG={{ .Version }}@{{ .Digest }}
+            - SNAPSHOT={{ .IsSnapshot }}
+          output: true

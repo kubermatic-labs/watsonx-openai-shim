@@ -1,0 +1,14 @@
+.DS_Store
+.git/
+.gitignore
+*.tmproj
+*.orig
+*.bak
+.vscode/
+.idea/
+
+# Local override files. values-custom.yaml holds live credentials in plain text
+# and must never end up inside a published chart tarball.
+values.lint.yaml
+values-custom.yaml
+values-*.local.yaml
