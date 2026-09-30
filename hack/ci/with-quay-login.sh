@@ -18,9 +18,12 @@ set -euo pipefail
 
 [ "${QUAY_IO_USERNAME:-}" ] && [ "${QUAY_IO_PASSWORD:-}" ] || { echo "QUAY_IO_USERNAME and QUAY_IO_PASSWORD must be set"; exit 1; }
 
+echo "Logging into quay.io"
 echo "${QUAY_IO_PASSWORD}" | docker login quay.io -u "${QUAY_IO_USERNAME}" --password-stdin
 
 unset QUAY_IO_USERNAME
 unset QUAY_IO_PASSWORD
+
+echo
 
 exec "$@"

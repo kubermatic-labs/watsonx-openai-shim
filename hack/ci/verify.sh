@@ -25,4 +25,6 @@ boilerplate --version
 golangci-lint --version
 goreleaser --version
 
+echo
+
 make verify-file-headers lint test $TOOL_LOCATIONS
