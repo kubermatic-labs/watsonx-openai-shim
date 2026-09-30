@@ -27,9 +27,17 @@ boilerplate --version
 golangci-lint --version
 goreleaser --version
 
+echo
+
 make verify-file-headers lint test $TOOL_LOCATIONS
+
+echo
 
 git remote add origin git@github.com:kubermatic-labs/watsonx-openai-shim.git
 export GITHUB_TOKEN=$(cat /etc/github/oauth | tr -d '\n')
 
-./hack/ci/with-dockerd.sh ./hack/ci/with-quay-login.sh make release $TOOL_LOCATIONS
+echo
+echo "Starting release process..."
+echo
+
+./hack/ci/with-dockerd.sh ./hack/ci/with-quay-login.sh make clean release $TOOL_LOCATIONS

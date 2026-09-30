@@ -18,11 +18,15 @@ set -euo pipefail
 
 dockerd --host=unix:///var/run/docker.sock &
 DOCKERD_PID=$!
-trap 'kill "$DOCKERD_PID"' EXIT
+trap 'echo terminating dockerd; kill "$DOCKERD_PID"' EXIT
 
 for _ in {1..30}; do
   if docker info >/dev/null 2>&1; then
-    exec "$@"
+    echo "dockerd is ready"
+    echo "Executing command: $@"
+    echo
+    "$@"
+    exit 0
   fi
   sleep 1
 done
