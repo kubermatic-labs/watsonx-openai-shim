@@ -1,7 +1,7 @@
 presubmits:
-  - name: pull-watsonx-openai-shim-verify
+  - name: pre-watsonx-openai-shim-verify
     always_run: true
-    decorate: false
+    decorate: true
     clone_uri: "ssh://git@github.com/kubermatic-labs/watsonx-openai-shim.git"
     spec:
       containers:

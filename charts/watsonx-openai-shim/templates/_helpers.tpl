@@ -98,7 +98,7 @@ default there is indistinguishable from a user-supplied value, and would shadow
 `global.imageRegistry` in every install.
 */}}
 {{- define "watsonx-openai-shim.defaultRegistry" -}}
-quay.io/kubermatic
+quay.io/kubermatic-labs
 {{- end -}}
 
 {{- define "watsonx-openai-shim.image" -}}
