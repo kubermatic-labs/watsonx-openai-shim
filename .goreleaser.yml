@@ -46,6 +46,6 @@ dockers_v2:
       post:
         - cmd: hack/release-helm-chart.sh charts/watsonx-openai-shim quay.io/kubermatic-labs/helm-charts {{ .Version }}
           env:
-            - IMAGE_TAG={{ .Version }}@{{ .Digest }}
+            - IMAGE_TAG={{ .Version }}
             - SNAPSHOT={{ .IsSnapshot }}
           output: true
