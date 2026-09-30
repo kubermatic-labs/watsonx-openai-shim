@@ -23,7 +23,7 @@ global:
 # image is the shim image, built from cmd/watsonx-openai-shim/Dockerfile.
 image:
   # registry overrides global.imageRegistry for this chart. Left empty it
-  # falls back to global.imageRegistry, and then to quay.io/kubermatic.
+  # falls back to global.imageRegistry, and then to quay.io/kubermatic-labs.
   registry: ""
   repository: "watsonx-openai-shim"
   tag: "v0.0.0-dev"

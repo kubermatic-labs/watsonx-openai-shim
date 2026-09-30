@@ -23,7 +23,7 @@ changelog:
       - '^chore(\([^)]+\))?:'
 dockers_v2:
   - images:
-      - quay.io/kubermatic/watsonx-openai-shim
+      - quay.io/kubermatic-labs/watsonx-openai-shim
     tags:
       - latest
       - "{{.Major}}"
@@ -43,7 +43,7 @@ dockers_v2:
       - linux/amd64
     hooks:
       post:
-        - cmd: hack/release-helm-chart.sh charts/watsonx-openai-shim quay.io/kubermatic/helm-charts {{ .Version }}
+        - cmd: hack/release-helm-chart.sh charts/watsonx-openai-shim quay.io/kubermatic-labs/helm-charts {{ .Version }}
           env:
             - IMAGE_TAG={{ .Version }}@{{ .Digest }}
             - SNAPSHOT={{ .IsSnapshot }}
