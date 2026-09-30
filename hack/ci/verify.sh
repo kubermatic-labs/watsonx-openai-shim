@@ -18,4 +18,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")"/../..
 
-make verify-file-headers lint test
+TOOL_LOCATIONS="GORELEASER=$(which goreleaser) GOLANGCI_LINT=$(which golangci-lint) BOILERPLATE=$(which boilerplate)"
+
+go version
+boilerplate --version
+golangci-lint --version
+goreleaser --version
+
+make verify-file-headers lint test $TOOL_LOCATIONS

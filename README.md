@@ -132,3 +132,8 @@ To run the linter, run:
 ```sh
 make lint
 ```
+
+To list all supported build targets, run:
+```sh
+make help
+```

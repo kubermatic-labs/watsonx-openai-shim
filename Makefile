@@ -2,9 +2,9 @@ GORELEASER_VERSION = v2.18.2
 GOLANGCI_LINT_VERSION = v2.14.0
 BOILERPLATE_VERSION = v0.3.0
 
-GORELEASER = _build/goreleaser
-GOLANGCI_LINT = _build/golangci-lint
-BOILERPLATE = _build/boilerplate
+GORELEASER ?= _build/goreleaser
+GOLANGCI_LINT ?= _build/golangci-lint
+BOILERPLATE ?= _build/boilerplate
 
 
 all: help
