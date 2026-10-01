@@ -13,7 +13,36 @@ On IBM Cloud Pak for Data (CPD), it also calls `/ml/v4/custom_foundation_models`
 - `GET /v1/models/{id}`: a single model watsonx.ai offers.
 - `GET /healthz`: liveness check.
 
-## Configuration
+## Installation
+
+### Helm
+
+To install/upgrade watsonx-openai-shim via Helm, you must prepare the configuration within a `values.yaml` like this first (placeholders must be replaced with real values):
+```yaml
+watsonx:
+  url: <WATSONX_URL>
+  projectID: <WATSONX_PROJECTID>
+  authMode: cpd # cpd for on-prem; iam for IBM Cloud
+  credentials:
+    apiKey: <CPD_APIKEY>
+    username: <CPD_USERNAME>
+```
+(For more options, see the [default values.yaml](./charts/watsonx-openai-shim/values.yaml).)
+
+Now you can install the Helm chart as follows (with `$VERSION` substituted with an actual release version):
+```sh
+helm upgrade --install watsonx-openai-shim oci://quay.io/kubermatic-labs/helm-charts/watsonx-openai-shim \
+  --version=$VERSION \
+  --values=values.yaml \
+  --timeout=5m \
+  --wait
+```
+
+### Container image
+
+The container image is published under `quay.io/kubermatic-labs/watsonx-openai-shim`.
+
+## CLI Configuration
 
 | Flag | Description |
 | --- | --- |
@@ -51,71 +80,6 @@ It replaces a token 5 minutes before it expires, or at half its lifetime for sho
 The expiry is taken from the IAM response or from the `exp` claim of the CPD token.
 When watsonx.ai rejects a token with 401, the shim obtains a new one and retries the request once.
 
-## Translation
-
-The watsonx.ai chat API is close to the OpenAI format, so most fields are passed on unchanged.
-
-Requests:
-
-- `model` becomes `model_id`, and the configured project ID is added.
-- `developer` messages become `system` messages, since watsonx.ai has no developer role.
-- Messages keep only `role`, `content`, `name`, `tool_calls` and `tool_call_id`.
-  `null` content is dropped.
-  Content parts of non-user messages are joined into a string,
-  since watsonx.ai accepts content parts only in user messages.
-- `tool_choice` becomes `tool_choice_option` for `auto`, `none` and `required`,
-  and stays `tool_choice` for a named function.
-- `max_completion_tokens` and `max_tokens` become `max_tokens`,
-  since older watsonx.ai releases do not know `max_completion_tokens`.
-  Without either, `--default-max-tokens` applies.
-- `tools`, `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `stop`, `n`, `seed`,
-  `response_format`, `logprobs`, `top_logprobs` and `logit_bias` are passed on.
-  Other fields are ignored.
-
-Responses:
-
-- `model_id` becomes `model`.
-- The `time_limit` finish reason becomes `length`.
-  The `cancelled` and `error` finish reasons are reported as errors.
-- `reasoning_content` is passed on.
-  It is no OpenAI field, but many OpenAI-compatible clients understand it.
-- watsonx.ai streams tool calls without an `index`.
-  The shim adds it: a tool call with an ID starts a new call,
-  and fragments without an ID continue the current one.
-- In streams, usage is sent as a final chunk only if the client set `stream_options.include_usage`.
-
-Models:
-
-- The models are fetched from `/ml/v1/foundation_model_specs?version=2024-05-31` on every request,
-  following all result pages.
-- Withdrawn models are left out, using the watsonx.ai filter `!lifecycle_withdrawn`.
-  Deprecated and constricted models are listed, since they still serve inference requests.
-  The filter does not apply to the custom foundation models.
-- With `--auth-mode=cpd`, the custom foundation models deployed on the CPD instance are added,
-  fetched from `/ml/v4/custom_foundation_models?version=2024-05-01`.
-  They are described in the same format and mapped the same way.
-- `id` is taken from `model_id`, and `owned_by` is set to `<provider> / <source>`.
-- `created` is the current time, since watsonx.ai reports no creation time.
-- The non-OpenAI fields `description`, `max_completion_tokens` and `token_limits` are added.
-  `description` is the `short_description` followed by the supported `task_ids`.
-  `max_completion_tokens` and `token_limits` are taken from `model_limits`.
-
-Errors:
-
-- Client errors reported by watsonx, e.g. an unknown model, keep their status code.
-- Authentication errors and all other upstream failures are reported as 502.
-- An error during a stream is sent as an error event, followed by `data: [DONE]`.
-- A client disconnect cancels the watsonx.ai request.
-
-## Limitations
-
-- `/v1/models` lists all foundation models, including models without chat support.
-- If the custom foundation models cannot be fetched on CPD, `/v1/models` fails with 502.
-- Streamed tool calls are assembled based on the format [IBM's Node SDK](https://github.com/IBM/watsonx-ai-node-sdk) expects.
-  However, the `ibm/ibm-defence-4-0-small` model returns tool calls as regular content chunks, formatted as Python-dict and prefixed with `<|tool_call|>` which the shim doesn't convert into a tool call but passes on to the client as is, e.g.: `<|tool_call|>{'name': 'bash', 'arguments': {'command': 'fortune | cowsay | lolcat'}}`.
-  Also, in case of the `ibm/granite-8b-code-instruct` model, the response even says that `--tool-call-parser` must be specified on the server for that to work.
-- Failed requests are not retried, except once for a rejected token.
-
 ## Development
 
 To build the container image, run:
@@ -137,3 +101,16 @@ To list all supported build targets, run:
 ```sh
 make help
 ```
+
+## Translating the watsonx to the OpenAI API
+
+The rules to translate from the watsonx.ai to the OpenAI API are documented [here](WATSONX2OPENAI.md).
+
+## Limitations
+
+- `/v1/models` lists all foundation models, including models without chat support.
+- If the custom foundation models cannot be fetched on CPD, `/v1/models` fails with 502.
+- Streamed tool calls are assembled based on the format [IBM's Node SDK](https://github.com/IBM/watsonx-ai-node-sdk) expects.
+  However, the `ibm/ibm-defence-4-0-small` model returns tool calls as regular content chunks, formatted as Python-dict and prefixed with `<|tool_call|>` which the shim doesn't convert into a tool call but passes on to the client as is, e.g.: `<|tool_call|>{'name': 'bash', 'arguments': {'command': 'fortune | cowsay | lolcat'}}`.
+  Also, in case of the `ibm/granite-8b-code-instruct` model, the response even says that `--tool-call-parser` must be specified on the server for that to work.
+- Failed requests are not retried, except once for a rejected token.
