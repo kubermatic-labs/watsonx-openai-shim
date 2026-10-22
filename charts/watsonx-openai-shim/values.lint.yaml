@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-route:
-  identifier: abcd12345678901234567890
-
 watsonx:
   url: fake-url
   projectID: fake-project-id
