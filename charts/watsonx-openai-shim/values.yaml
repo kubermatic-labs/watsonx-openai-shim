@@ -90,9 +90,6 @@ service:
 # cluster.
 route:
   enabled: true
-  # identifier is the value of the discovery label an LLMBackend selects the
-  # route by. Required when the route is enabled.
-  identifier: ""
   pathPrefix: /watsonx/
   gateway:
     name: llm-provider-gateway

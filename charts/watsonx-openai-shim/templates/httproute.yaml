@@ -19,13 +19,9 @@ metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    # The label allows kdp-llm-controller-manager (running within the kubelb management cluster)
-    # to discover the LLM provider's route that lives within a tenant namespace within the
-    # kubelb management cluster.
-    # LLMBackend resource must use this label to select the corresponding HTTPRoute.
-    {{- $identifier := required "route.identifier is required when route.enabled is true (it is the key an LLMBackend selects this route by)" .Values.route.identifier -}}
-    {{- if or (lt (len $identifier) 24) (gt (len $identifier) 63) (not (regexMatch "^[A-Za-z0-9]([A-Za-z0-9_.-]*[A-Za-z0-9])?$" $identifier)) }}{{ fail "route.identifier must be 24-63 characters and a valid Kubernetes label value" }}{{- end }}
-    ai.kdp.k8c.io/secret-provider-route-key: {{ $identifier | quote }}
+    # The label allows kdp-llm-controller-manager (running within the KubeLB management cluster)
+    # to efficiently discover the route that exposes the Service an LLMBackend references.
+    ai.kdp.k8c.io/ai-service: {{ .Release.Name }}
     {{- include "watsonx-openai-shim.labels" . | nindent 4 }}
 spec:
   parentRefs:
